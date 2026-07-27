@@ -1,0 +1,19 @@
+## Ignore Visual Studio / .NET build outputs
+[Bb]in/
+[Oo]bj/
+.vs/
+.vscode/
+*.user
+*.userosscache
+*.sln.docstates
+
+## Database files
+*.db
+*.db-shm
+*.db-wal
+*.mdf
+*.ldf
+
+## OS generated files
+.DS_Store
+Thumbs.db
