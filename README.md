@@ -1,6 +1,25 @@
 # 🚀 Hướng Dẫn K6 Load Test So Sánh Hiệu Năng EF Core vs Dapper
 
-Dự án này tích hợp sẵn bộ API Endpoint và k6 script để đo đạc và so sánh hiệu năng giữa **Entity Framework Core** và **Dapper** dưới tải cao (50+ Virtual Users đồng thời).
+Dự án này tích hợp sẵn bộ API Endpoint và k6 script để đo đạc và so sánh hiệu năng giữa **Entity Framework Core** và **Dapper** dưới tải cao (50 Virtual Users đồng thời trong 25 giây).
+
+---
+
+## 🏆 BÁO CÁO KẾT QUẢ LOAD TEST TRỌN BỘ 5 KỊCH BẢN (50 Virtual Users)
+
+Bảng tổng hợp kết quả đo đạc thực tế 5 kịch bản bằng Grafana k6 dưới tải 50 Virtual Users đồng thời:
+
+| Kịch bản Test (Scenario) | Công nghệ | Tổng Request | Thông lượng (RPS) | Latency Trung bình (Avg) | Latency Trung vị (Med) | Latency 95% (p95) | Tỷ lệ Lỗi |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **1. Single Read** *(Đọc 1 bản ghi)* | EF Core | 19,959 | 798.14 RPS | 14.21 ms | 2.20 ms | 52.68 ms | 0.00% |
+| | **Dapper** | **32,115** | **1,284.37 RPS** | **1.07 ms** | **0.65 ms** | **2.69 ms** | **0.00%** |
+| **2. Filter Query** *(Lọc & Sắp xếp)* | EF Core | 10,410 | 416.31 RPS | 46.12 ms | 12.40 ms | 141.23 ms | 0.00% |
+| | **Dapper** | **29,961** | **1,197.79 RPS** | **2.58 ms** | **2.24 ms** | **4.91 ms** | **0.00%** |
+| **3. Join Query** *(Multi-table Join)* | EF Core | 12,745 | 508.09 RPS | 33.89 ms | 5.50 ms | 119.65 ms | 0.00% |
+| | **Dapper** | **31,124** | **1,244.77 RPS** | **1.78 ms** | **1.46 ms** | **3.82 ms** | **0.00%** |
+| **4. Bulk Insert** *(Chèn 20 bản ghi)* | EF Core | 552 | 21.34 RPS | 1,321.93 ms | 544.53 ms | 2,682.76 ms | 0.00% |
+| | **Dapper** | **1,823** | **71.96 RPS** | **383.26 ms** | **144.07 ms** | **1,882.53 ms** | **0.00%** |
+| **5. Update** *(Cập nhật dữ liệu)* | EF Core | 8,357 | 334.16 RPS | 64.54 ms | 7.37 ms | 312.43 ms | 0.00% |
+| | **Dapper** | **19,216** | **768.64 RPS** | **15.76 ms** | **0.53 ms** | **157.88 ms** | **0.00%** |
 
 ---
 
@@ -23,9 +42,7 @@ winget install k6 --source winget
 
 ## 🏷️ 2. Dấu Hiệu Phân Biệt Test EF Core vs Dapper
 
-Khi bạn mở **2 cửa sổ Terminal song song** để chạy 2 lệnh k6 cùng lúc, làm thế nào để biết Terminal nào đang test EF Core và Terminal nào đang test Dapper?
-
-Bộ k6 script ([k6-benchmark.js](file:///e:/Compare%20EF%20and%20Dapper/k6-benchmark.js)) đã được gắn nhãn nhận biết rõ ràng trên giao diện Terminal:
+Khi bạn mở **2 cửa sổ Terminal song song** để chạy 2 lệnh k6 cùng lúc, bạn có thể dễ dàng phân biệt nhờ các nhãn nhận diện trên giao diện K6 Terminal:
 
 | Vị trí hiển thị trên K6 Terminal | Test EF Core | Test Dapper |
 | :--- | :--- | :--- |
@@ -37,64 +54,93 @@ Bộ k6 script ([k6-benchmark.js](file:///e:/Compare%20EF%20and%20Dapper/k6-benc
 
 ## ⚡ 3. Các Câu Lệnh Chạy Test
 
-Bạn truyền tham số `-e TARGET=ef` hoặc `-e TARGET=dapper` và `-e SCENARIO=...` vào lệnh k6:
+Truyền tham số `-e TARGET=ef` hoặc `-e TARGET=dapper` và `-e SCENARIO=...` vào lệnh k6:
 
 ### 1️⃣ Kịch bản Single Read (Đọc bản ghi theo ID)
 ```powershell
-# Terminal 1 - EF Core
+# EF Core
 k6 run -e TARGET=ef -e SCENARIO=single-read k6-benchmark.js
 
-# Terminal 2 - Dapper
+# Dapper
 k6 run -e TARGET=dapper -e SCENARIO=single-read k6-benchmark.js
 ```
 
 ### 2️⃣ Kịch bản Filter Query (Lọc theo CategoryId & Price)
 ```powershell
-# Terminal 1 - EF Core
+# EF Core
 k6 run -e TARGET=ef -e SCENARIO=filter-query k6-benchmark.js
 
-# Terminal 2 - Dapper
+# Dapper
 k6 run -e TARGET=dapper -e SCENARIO=filter-query k6-benchmark.js
 ```
 
 ### 3️⃣ Kịch bản Join Query (Multi-table Join Products + Categories)
 ```powershell
-# Terminal 1 - EF Core
+# EF Core
 k6 run -e TARGET=ef -e SCENARIO=join-query k6-benchmark.js
 
-# Terminal 2 - Dapper
+# Dapper
 k6 run -e TARGET=dapper -e SCENARIO=join-query k6-benchmark.js
 ```
 
 ### 4️⃣ Kịch bản Bulk Insert (Thêm mới hàng loạt bản ghi)
 ```powershell
-# Terminal 1 - EF Core
+# EF Core
 k6 run -e TARGET=ef -e SCENARIO=bulk-insert k6-benchmark.js
 
-# Terminal 2 - Dapper
+# Dapper
 k6 run -e TARGET=dapper -e SCENARIO=bulk-insert k6-benchmark.js
 ```
 
 ### 5️⃣ Kịch bản Update (Cập nhật dữ liệu)
 ```powershell
-# Terminal 1 - EF Core
+# EF Core
 k6 run -e TARGET=ef -e SCENARIO=update k6-benchmark.js
 
-# Terminal 2 - Dapper
+# Dapper
 k6 run -e TARGET=dapper -e SCENARIO=update k6-benchmark.js
 ```
 
-> 💡 **Tùy chỉnh Port:** Nếu ứng dụng của bạn chạy cổng khác `5136`, thêm `-e BASE_URL=http://localhost:<PORT>` vào cuối câu lệnh.
+---
+
+## 📖 4. Hướng Dẫn Giải Thích Chi Tiết Các Thông Số Trong K6 Output
+
+Khi k6 chạy xong, màn hình sẽ hiển thị bảng kết quả chia thành 4 khối chính: **CUSTOM**, **HTTP**, **EXECUTION**, và **NETWORK**. Dưới đây là ý nghĩa chi tiết từng thông số:
+
+### 🎯 1. Khối `CUSTOM` (Chỉ số đo lường tùy chỉnh)
+Khối này chứa các metric được định nghĩa riêng trong file `k6-benchmark.js` cho từng công nghệ:
+
+* **`latency_<target>_<scenario>`**: Thời gian xử lý request riêng cho kịch bản và ORM đang test.
+  * `avg`: Thời gian phản hồi trung bình (ms).
+  * `min` / `med` / `max`: Thời gian nhanh nhất / trung vị (50%) / chậm nhất (ms).
+  * `p(90)` / `p(95)`: **Percentile 90% và 95%** (Ví dụ: `p(95)=2.69ms` nghĩa là 95% số request phản hồi nhanh hơn 2.69ms).
+* **`errors_<target>_<scenario>`**: Tổng số request bị lỗi trong suốt quá trình chạy test.
 
 ---
 
-## 📊 4. Cách Đọc Bảng Kết Quả K6
+### 🌐 2. Khối `HTTP` (Chỉ số giao thức HTTP)
+Khối này đo đạc các thông số về các HTTP Request được gửi đến Web Server:
 
-Sau 25 giây thực thi, k6 sẽ in ra bảng tổng kết. Hãy chú ý các chỉ số quan trọng:
+* **`http_req_duration`**: Tổng thời gian từ khi client gửi request đến khi nhận xong response từ Server.
+  * **`{ expected_response:true }`**: Chỉ số đo riêng cho các request thành công (Status 200 OK).
+* **`http_req_failed`**: Tỷ lệ phần trăm request bị lỗi (`0.00%` là lý tưởng).
+* **`http_reqs`**: Tổng số HTTP Request đã gửi và **Thông lượng (RPS - Request Per Second)**.
+  * *Ví dụ:* `32115  1284.37/s` -> Tổng cộng 32,115 request, đạt tốc độ **1,284.37 request/giây**.
 
-1. **`http_reqs` (Throughput/RPS):** Tổng số request được xử lý mỗi giây.
-   - *Ví dụ:* `768.64/s` -> **Càng cao càng tốt**.
-2. **`http_req_duration` (`p(95)`):** Thời gian 95% request phản hồi đến tay client.
-   - *Ví dụ:* `157.88ms` -> **Càng thấp càng tốt**.
-3. **`http_req_failed`:** Tỷ lệ lỗi.
-   - *Chuẩn:* `0.00%` (Không có request nào bị lỗi).
+---
+
+### ⚙️ 3. Khối `EXECUTION` (Chỉ số tiến trình thực thi của K6)
+Khối này phản ánh cách các Virtual Users (VUs - Người dùng ảo) vận hành:
+
+* **`iteration_duration`**: Thời gian hoàn thành 1 vòng lặp test (Bao gồm: Gửi HTTP Request + thời gian nghỉ `sleep(20ms)`).
+* **`iterations`**: Tổng số vòng lặp k6 đã thực hiện và tốc độ vòng lặp/giây.
+* **`vus`**: Số lượng Virtual Users đang chạy thực tế tại thời điểm kết thúc test (`min` / `max`).
+* **`vus_max`**: Số lượng Virtual Users tối đa được cấu hình trong test (Ví dụ: `50 VUs`).
+
+---
+
+### 📡 4. Khối `NETWORK` (Chỉ số băng thông mạng)
+Khối này thống kê lưu lượng dữ liệu truyền qua lại giữa K6 Client và Web Server:
+
+* **`data_received`**: Tổng dung lượng dữ liệu K6 nhận về từ Web Server và tốc độ tải xuống (`kB/s` hoặc `MB/s`).
+* **`data_sent`**: Tổng dung lượng dữ liệu K6 gửi lên Web Server và tốc độ tải lên (`kB/s` hoặc `MB/s`).
