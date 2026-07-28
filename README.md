@@ -4,24 +4,7 @@ Dự án này tích hợp sẵn bộ API Endpoint và k6 script để đo đạc
 
 ---
 
-## 🏆 BÁO CÁO KẾT QUẢ LOAD TEST TRỌN BỘ 5 KỊCH BẢN (50 Virtual Users)
 
-Bảng tổng hợp kết quả đo đạc thực tế 5 kịch bản bằng Grafana k6 dưới tải 50 Virtual Users đồng thời:
-
-| Kịch bản Test (Scenario) | Công nghệ | Tổng Request | Thông lượng (RPS) | Latency Trung bình (Avg) | Latency Trung vị (Med) | Latency 95% (p95) | Tỷ lệ Lỗi |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **1. Single Read** *(Đọc 1 bản ghi)* | EF Core | 19,959 | 798.14 RPS | 14.21 ms | 2.20 ms | 52.68 ms | 0.00% |
-| | **Dapper** | **32,115** | **1,284.37 RPS** | **1.07 ms** | **0.65 ms** | **2.69 ms** | **0.00%** |
-| **2. Filter Query** *(Lọc & Sắp xếp)* | EF Core | 10,410 | 416.31 RPS | 46.12 ms | 12.40 ms | 141.23 ms | 0.00% |
-| | **Dapper** | **29,961** | **1,197.79 RPS** | **2.58 ms** | **2.24 ms** | **4.91 ms** | **0.00%** |
-| **3. Join Query** *(Multi-table Join)* | EF Core | 12,745 | 508.09 RPS | 33.89 ms | 5.50 ms | 119.65 ms | 0.00% |
-| | **Dapper** | **31,124** | **1,244.77 RPS** | **1.78 ms** | **1.46 ms** | **3.82 ms** | **0.00%** |
-| **4. Bulk Insert** *(Chèn 20 bản ghi)* | EF Core | 552 | 21.34 RPS | 1,321.93 ms | 544.53 ms | 2,682.76 ms | 0.00% |
-| | **Dapper** | **1,823** | **71.96 RPS** | **383.26 ms** | **144.07 ms** | **1,882.53 ms** | **0.00%** |
-| **5. Update** *(Cập nhật dữ liệu)* | EF Core | 8,357 | 334.16 RPS | 64.54 ms | 7.37 ms | 312.43 ms | 0.00% |
-| | **Dapper** | **19,216** | **768.64 RPS** | **15.76 ms** | **0.53 ms** | **157.88 ms** | **0.00%** |
-
----
 
 ## 📌 1. Chuẩn bị Môi trường
 
