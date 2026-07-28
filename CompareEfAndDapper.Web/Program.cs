@@ -58,6 +58,7 @@ else
 }
 
 builder.Services.AddScoped<DapperRepository>();
+builder.Services.AddScoped<SqlCommandRepository>();
 builder.Services.AddSingleton<ExecutionFlowAnalyzer>();
 builder.Services.AddScoped<PerformanceBenchmarkService>();
 

@@ -220,6 +220,10 @@ select:focus, input:focus {
   border-top: 4px solid var(--accent-ef);
 }
 
+.framework-card.sql-card {
+  border-top: 4px solid #ec4899; /* Vibrant Pink / Rose */
+}
+
 .framework-card.dapper-card {
   border-top: 4px solid var(--accent-dapper);
 }
@@ -250,6 +254,12 @@ select:focus, input:focus {
   background: rgba(56, 189, 248, 0.15);
   color: var(--accent-ef);
   border: 1px solid var(--accent-ef);
+}
+
+.sql-tag {
+  background: rgba(236, 72, 153, 0.15);
+  color: #ec4899;
+  border: 1px solid #ec4899;
 }
 
 .dapper-tag {

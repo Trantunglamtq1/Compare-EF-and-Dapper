@@ -1,6 +1,6 @@
-# 🚀 Hướng Dẫn K6 Load Test So Sánh Hiệu Năng EF Core vs Dapper
+# 🚀 Hướng Dẫn K6 Load Test So Sánh Hiệu Năng EF Core vs Dapper vs SQL Command
 
-Dự án này tích hợp sẵn bộ API Endpoint và k6 script để đo đạc và so sánh hiệu năng giữa **Entity Framework Core** và **Dapper** dưới tải cao (50 Virtual Users đồng thời trong 25 giây).
+Dự án này tích hợp sẵn bộ API Endpoint và k6 script để đo đạc và so sánh hiệu năng giữa **Entity Framework Core**, **Dapper** và **Raw SQL Command (ADO.NET)** dưới tải cao (50 Virtual Users đồng thời trong 25 giây).
 
 ---
 
@@ -23,21 +23,23 @@ winget install k6 --source winget
 
 ---
 
-## 🏷️ 2. Dấu Hiệu Phân Biệt Test EF Core vs Dapper
+## 🏷️ 2. Dấu Hiệu Phân Biệt Test (3 Targets)
 
-Khi bạn mở **2 cửa sổ Terminal song song** để chạy 2 lệnh k6 cùng lúc, bạn có thể dễ dàng phân biệt nhờ các nhãn nhận diện trên giao diện K6 Terminal:
+Khi mở **nhiều cửa sổ Terminal song song**, bạn có thể phân biệt từng ORM nhờ nhãn nhận diện tự động:
 
-| Vị trí hiển thị trên K6 Terminal | Test EF Core | Test Dapper |
-| :--- | :--- | :--- |
-| **Tiêu đề Scenario (Màn hình chính)** | `* TEST_EF_CORE_UPDATE` | `* TEST_DAPPER_UPDATE` |
-| **Tên Metric đo thời gian (Custom)** | `latency_ef_update` | `latency_dapper_update` |
-| **Dấu kiểm tra thành công (Check)** | `✓ [EF_CORE] status 200 OK` | `✓ [DAPPER] status 200 OK` |
+| Vị trí hiển thị trên K6 Terminal | EF Core | Dapper | SQL Command |
+| :--- | :--- | :--- | :--- |
+| **Tiêu đề Scenario** | `TEST_EF_CORE_UPDATE` | `TEST_DAPPER_UPDATE` | `TEST_SQL_CMD_UPDATE` |
+| **Tên Metric (Custom)** | `latency_ef_update` | `latency_dapper_update` | `latency_sql_update` |
+| **Check thành công** | `✓ [EF_CORE] status 200 OK` | `✓ [DAPPER] status 200 OK` | `✓ [SQL_CMD] status 200 OK` |
+
+> 💡 **SQL Command** = ADO.NET thuần (`DbCommand` + `DbDataReader`) — không dùng ORM hay Micro-ORM. Đây là mức truy cập database thấp nhất và là **baseline hiệu năng tuyệt đối**.
 
 ---
 
 ## ⚡ 3. Các Câu Lệnh Chạy Test
 
-Truyền tham số `-e TARGET=ef` hoặc `-e TARGET=dapper` và `-e SCENARIO=...` vào lệnh k6:
+Truyền tham số `-e TARGET=ef`, `-e TARGET=dapper` hoặc `-e TARGET=sql` và `-e SCENARIO=...` vào lệnh k6:
 
 ### 1️⃣ Kịch bản Single Read (Đọc bản ghi theo ID)
 ```powershell
@@ -46,6 +48,9 @@ k6 run -e TARGET=ef -e SCENARIO=single-read k6-benchmark.js
 
 # Dapper
 k6 run -e TARGET=dapper -e SCENARIO=single-read k6-benchmark.js
+
+# Raw SQL Command
+k6 run -e TARGET=sql -e SCENARIO=single-read k6-benchmark.js
 ```
 
 ### 2️⃣ Kịch bản Filter Query (Lọc theo CategoryId & Price)
@@ -55,6 +60,9 @@ k6 run -e TARGET=ef -e SCENARIO=filter-query k6-benchmark.js
 
 # Dapper
 k6 run -e TARGET=dapper -e SCENARIO=filter-query k6-benchmark.js
+
+# Raw SQL Command
+k6 run -e TARGET=sql -e SCENARIO=filter-query k6-benchmark.js
 ```
 
 ### 3️⃣ Kịch bản Join Query (Multi-table Join Products + Categories)
@@ -64,6 +72,9 @@ k6 run -e TARGET=ef -e SCENARIO=join-query k6-benchmark.js
 
 # Dapper
 k6 run -e TARGET=dapper -e SCENARIO=join-query k6-benchmark.js
+
+# Raw SQL Command
+k6 run -e TARGET=sql -e SCENARIO=join-query k6-benchmark.js
 ```
 
 ### 4️⃣ Kịch bản Bulk Insert (Thêm mới hàng loạt bản ghi)
@@ -73,6 +84,9 @@ k6 run -e TARGET=ef -e SCENARIO=bulk-insert k6-benchmark.js
 
 # Dapper
 k6 run -e TARGET=dapper -e SCENARIO=bulk-insert k6-benchmark.js
+
+# Raw SQL Command
+k6 run -e TARGET=sql -e SCENARIO=bulk-insert k6-benchmark.js
 ```
 
 ### 5️⃣ Kịch bản Update (Cập nhật dữ liệu)
@@ -82,6 +96,9 @@ k6 run -e TARGET=ef -e SCENARIO=update k6-benchmark.js
 
 # Dapper
 k6 run -e TARGET=dapper -e SCENARIO=update k6-benchmark.js
+
+# Raw SQL Command
+k6 run -e TARGET=sql -e SCENARIO=update k6-benchmark.js
 ```
 
 ---

@@ -74,17 +74,17 @@ async function runBenchmark() {
         const res = await fetch(`/api/comparison/run-benchmark?scenario=${scenario}&iterations=${iterations}&isColdStart=${isColdStart}`);
         const data = await res.json();
 
-        // Update EF Core Tracking
+        // Update EF Core
         document.getElementById('efTrackTime').textContent = `${data.efCoreTrackingResult.elapsedMilliseconds} ms`;
         document.getElementById('efTrackRam').textContent = formatBytes(data.efCoreTrackingResult.allocatedBytes);
         document.getElementById('efTrackCode').textContent = data.efCoreTrackingResult.codeSnippet;
         document.getElementById('efTrackSql').textContent = data.efCoreTrackingResult.sqlExecuted;
 
-        // Update EF Core NoTracking
-        document.getElementById('efNoTrackTime').textContent = `${data.efCoreNoTrackingResult.elapsedMilliseconds} ms`;
-        document.getElementById('efNoTrackRam').textContent = formatBytes(data.efCoreNoTrackingResult.allocatedBytes);
-        document.getElementById('efNoTrackCode').textContent = data.efCoreNoTrackingResult.codeSnippet;
-        document.getElementById('efNoTrackSql').textContent = data.efCoreNoTrackingResult.sqlExecuted;
+        // Update SQL Command (ADO.NET)
+        document.getElementById('sqlCmdTime').textContent = `${data.sqlCommandResult.elapsedMilliseconds} ms`;
+        document.getElementById('sqlCmdRam').textContent = formatBytes(data.sqlCommandResult.allocatedBytes);
+        document.getElementById('sqlCmdCode').textContent = data.sqlCommandResult.codeSnippet;
+        document.getElementById('sqlCmdSql').textContent = data.sqlCommandResult.sqlExecuted;
 
         // Update Dapper
         document.getElementById('dapperTime').textContent = `${data.dapperResult.elapsedMilliseconds} ms`;

@@ -11,11 +11,16 @@ public class K6TestController : ControllerBase
 {
     private readonly AppDbContext _dbContext;
     private readonly DapperRepository _dapperRepository;
+    private readonly SqlCommandRepository _sqlRepository;
 
-    public K6TestController(AppDbContext dbContext, DapperRepository dapperRepository)
+    public K6TestController(
+        AppDbContext dbContext,
+        DapperRepository dapperRepository,
+        SqlCommandRepository sqlRepository)
     {
         _dbContext = dbContext;
         _dapperRepository = dapperRepository;
+        _sqlRepository = sqlRepository;
     }
 
     // --- Scenario 1: Single Read ---
@@ -32,6 +37,14 @@ public class K6TestController : ControllerBase
     public async Task<IActionResult> DapperSingleRead(int id = 42)
     {
         var product = await _dapperRepository.GetByIdAsync(id);
+        if (product == null) return NotFound();
+        return Ok(product);
+    }
+
+    [HttpGet("sql/single-read/{id}")]
+    public async Task<IActionResult> SqlSingleRead(int id = 42)
+    {
+        var product = await _sqlRepository.GetByIdAsync(id);
         if (product == null) return NotFound();
         return Ok(product);
     }
@@ -57,6 +70,13 @@ public class K6TestController : ControllerBase
         return Ok(products);
     }
 
+    [HttpGet("sql/filter-query")]
+    public async Task<IActionResult> SqlFilterQuery([FromQuery] int categoryId = 1, [FromQuery] decimal minPrice = 100, [FromQuery] int limit = 50)
+    {
+        var products = await _sqlRepository.GetProductsWithFilterAsync(categoryId, minPrice, limit);
+        return Ok(products);
+    }
+
     // --- Scenario 3: Join Query ---
 
     [HttpGet("ef/join-query")]
@@ -77,6 +97,13 @@ public class K6TestController : ControllerBase
         return Ok(products);
     }
 
+    [HttpGet("sql/join-query")]
+    public async Task<IActionResult> SqlJoinQuery([FromQuery] int limit = 50)
+    {
+        var products = await _sqlRepository.GetProductsWithCategoryAsync(limit);
+        return Ok(products);
+    }
+
     // --- Scenario 4: Bulk Insert ---
 
     [HttpPost("ef/bulk-insert")]
@@ -94,6 +121,14 @@ public class K6TestController : ControllerBase
     {
         var batch = GenerateBatch(count);
         var inserted = await _dapperRepository.BulkInsertProductsAsync(batch);
+        return Ok(new { inserted });
+    }
+
+    [HttpPost("sql/bulk-insert")]
+    public async Task<IActionResult> SqlBulkInsert([FromQuery] int count = 50)
+    {
+        var batch = GenerateBatch(count);
+        var inserted = await _sqlRepository.BulkInsertProductsAsync(batch);
         return Ok(new { inserted });
     }
 
@@ -120,6 +155,13 @@ public class K6TestController : ControllerBase
             Stock = 100
         };
         var updated = await _dapperRepository.UpdateProductAsync(product);
+        return Ok(new { updated });
+    }
+
+    [HttpPut("sql/update/{id}")]
+    public async Task<IActionResult> SqlUpdate(int id = 1)
+    {
+        var updated = await _sqlRepository.UpdateProductAsync(id, 199.99m);
         return Ok(new { updated });
     }
 

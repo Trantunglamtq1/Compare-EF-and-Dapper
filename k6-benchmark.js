@@ -3,11 +3,13 @@ import { check, sleep } from 'k6';
 import { Trend, Counter } from 'k6/metrics';
 
 // Custom Parameters (truyền qua -e TARGET=... -e SCENARIO=... -e BASE_URL=...)
-const target = (__ENV.TARGET || 'ef').toLowerCase(); // 'ef' hoặc 'dapper'
+const target = (__ENV.TARGET || 'ef').toLowerCase(); // 'ef' | 'dapper' | 'sql'
 const scenario = (__ENV.SCENARIO || 'single-read').toLowerCase();
 const baseUrl = __ENV.BASE_URL || 'http://localhost:5136';
 
-const targetLabel = target === 'dapper' ? 'DAPPER' : 'EF_CORE';
+const targetLabel = target === 'dapper' ? 'DAPPER'
+                  : target === 'sql'    ? 'SQL_CMD'
+                  : 'EF_CORE';
 const scenarioClean = scenario.replace(/-/g, '_').toUpperCase();
 
 const metricNameLatency = `latency_${target}_${scenarioClean.toLowerCase()}`;

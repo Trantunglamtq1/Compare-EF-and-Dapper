@@ -24,7 +24,7 @@ public class BenchmarkComparisonSuite
     public string Title { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public BenchmarkResult EfCoreTrackingResult { get; set; } = new();
-    public BenchmarkResult EfCoreNoTrackingResult { get; set; } = new();
+    public BenchmarkResult SqlCommandResult { get; set; } = new();
     public BenchmarkResult DapperResult { get; set; } = new();
     public string SpeedupSummary { get; set; } = string.Empty;
 }
@@ -33,11 +33,16 @@ public class PerformanceBenchmarkService
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly DapperRepository _dapperRepository;
+    private readonly SqlCommandRepository _sqlRepository;
 
-    public PerformanceBenchmarkService(IServiceProvider serviceProvider, DapperRepository dapperRepository)
+    public PerformanceBenchmarkService(
+        IServiceProvider serviceProvider,
+        DapperRepository dapperRepository,
+        SqlCommandRepository sqlRepository)
     {
         _serviceProvider = serviceProvider;
         _dapperRepository = dapperRepository;
+        _sqlRepository = sqlRepository;
     }
 
     public async Task<BenchmarkComparisonSuite> RunScenarioAsync(string scenarioId, int iterations = 10, bool isColdStart = false)
@@ -71,18 +76,15 @@ public class PerformanceBenchmarkService
             return (item != null ? 1 : 0, AppDbContext.LastExecutedSql ?? "SELECT * FROM Products WHERE Id = @p0");
         });
 
-        // 2. EF Core NoTracking (Best Native Practice: AsNoTracking.FirstOrDefaultAsync for direct query)
-        AppDbContext.ClearLogs();
-        var efNoTrackingMetrics = await MeasureAsync(async () =>
+        // 2. Raw SQL Command (ADO.NET)
+        var sqlMetrics = await MeasureAsync(async () =>
         {
             Product? item = null;
             for (int i = 0; i < iterations; i++)
             {
-                using var scope = _serviceProvider.CreateScope();
-                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                item = await db.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Id == targetId);
+                item = await _sqlRepository.GetByIdAsync(targetId);
             }
-            return (item != null ? 1 : 0, AppDbContext.LastExecutedSql ?? "SELECT * FROM Products WHERE Id = @p0");
+            return (item != null ? 1 : 0, "SELECT Id, Name, Sku, Price, Stock, CategoryId, CreatedAt FROM Products WHERE Id = @Id");
         });
 
         // 3. Dapper (Best Native Practice: QuerySingleOrDefaultAsync for single POCO read)
@@ -100,10 +102,10 @@ public class PerformanceBenchmarkService
             "single-read",
             "1. Lấy thông tin đơn lẻ theo Id (Optimal Native Practice)",
             $"Thực thi truy vấn 1 Product theo Id sử dụng phương thức tối ưu nhất của từng thư viện trong {iterations} lần lặp.",
-            efTrackingMetrics, efNoTrackingMetrics, dapperMetrics,
-            "await db.Products.FindAsync(id); // (EF Core Native Best Practice - Primary Key Lookup)",
-            "await db.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id); // (EF Core NoTracking Best Practice)",
-            "await connection.QuerySingleOrDefaultAsync<Product>(sql, new { Id = id }); // (Dapper Native Best Practice)",
+            efTrackingMetrics, sqlMetrics, dapperMetrics,
+            "await db.Products.FindAsync(id); // (EF Core Native)",
+            "await sqlRepo.GetByIdAsync(id); // (Raw ADO.NET SqlCommand)",
+            "await connection.QuerySingleOrDefaultAsync<Product>(sql, new { Id = id }); // (Dapper Micro-ORM)",
             isColdStart
         );
     }
@@ -133,23 +135,16 @@ public class PerformanceBenchmarkService
             return (count, AppDbContext.LastExecutedSql ?? "SELECT TOP(50) ... FROM Products WHERE CategoryId = @p0 AND Price >= @p1");
         });
 
-        // 2. EF Core NoTracking
-        AppDbContext.ClearLogs();
-        var efNoTrackingMetrics = await MeasureAsync(async () =>
+        // 2. Raw SQL Command
+        var sqlMetrics = await MeasureAsync(async () =>
         {
-            using var scope = _serviceProvider.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             int count = 0;
             for (int i = 0; i < iterations; i++)
             {
-                var list = await db.Products.AsNoTracking()
-                    .Where(p => p.CategoryId == categoryId && p.Price >= minPrice)
-                    .OrderByDescending(p => p.Price)
-                    .Take(limit)
-                    .ToListAsync();
+                var list = await _sqlRepository.GetProductsWithFilterAsync(categoryId, minPrice, limit);
                 count = list.Count;
             }
-            return (count, AppDbContext.LastExecutedSql ?? "SELECT TOP(50) ... FROM Products WHERE CategoryId = @p0 AND Price >= @p1");
+            return (count, "SELECT TOP (@Limit) Id, Name, Sku, Price, Stock, CategoryId FROM Products WHERE CategoryId = @CategoryId AND Price >= @MinPrice ORDER BY Price DESC");
         });
 
         // 3. Dapper
@@ -168,9 +163,9 @@ public class PerformanceBenchmarkService
             "filter-query",
             "2. Truy vấn danh sách có Lọc & Sắp xếp (Filtered Query)",
             $"Thực thi truy vấn danh sách 50 sản phẩm có điều kiện CategoryId & Price trong {iterations} lần lặp.",
-            efTrackingMetrics, efNoTrackingMetrics, dapperMetrics,
+            efTrackingMetrics, sqlMetrics, dapperMetrics,
             "await db.Products.Where(p => p.CategoryId == catId && p.Price >= minPrice).OrderByDescending(p => p.Price).Take(50).ToListAsync();",
-            "await db.Products.AsNoTracking().Where(p => p.CategoryId == catId && p.Price >= minPrice).OrderByDescending(p => p.Price).Take(50).ToListAsync();",
+            "await sqlRepo.GetProductsWithFilterAsync(catId, minPrice, 50);",
             "await connection.QueryAsync<Product>(sql, new { CategoryId = catId, MinPrice = minPrice, Limit = 50 });",
             isColdStart
         );
@@ -198,22 +193,16 @@ public class PerformanceBenchmarkService
             return (count, AppDbContext.LastExecutedSql ?? "SELECT TOP(50) [p].[Id], ... FROM [Products] AS [p] INNER JOIN [Categories] AS [c] ON [p].[CategoryId] = [c].[Id]");
         });
 
-        // 2. EF Core NoTracking
-        AppDbContext.ClearLogs();
-        var efNoTrackingMetrics = await MeasureAsync(async () =>
+        // 2. Raw SQL Command
+        var sqlMetrics = await MeasureAsync(async () =>
         {
-            using var scope = _serviceProvider.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             int count = 0;
             for (int i = 0; i < iterations; i++)
             {
-                var list = await db.Products.AsNoTracking()
-                    .Include(p => p.Category)
-                    .Take(limit)
-                    .ToListAsync();
+                var list = await _sqlRepository.GetProductsWithCategoryAsync(limit);
                 count = list.Count;
             }
-            return (count, AppDbContext.LastExecutedSql ?? "SELECT TOP(50) [p].[Id], ... FROM [Products] AS [p] INNER JOIN [Categories] AS [c] ON [p].[CategoryId] = [c].[Id]");
+            return (count, "SELECT TOP (@Limit) p.*, c.* FROM Products p INNER JOIN Categories c ON p.CategoryId = c.Id");
         });
 
         // 3. Dapper
@@ -232,9 +221,9 @@ public class PerformanceBenchmarkService
             "join-query",
             "3. Truy vấn Join 2 bảng Multi-mapping (Products + Categories)",
             $"Thực thi Inner Join lấy {limit} sản phẩm kèm thông tin Category trong {iterations} lần lặp.",
-            efTrackingMetrics, efNoTrackingMetrics, dapperMetrics,
+            efTrackingMetrics, sqlMetrics, dapperMetrics,
             "await db.Products.Include(p => p.Category).Take(50).ToListAsync();",
-            "await db.Products.AsNoTracking().Include(p => p.Category).Take(50).ToListAsync();",
+            "await sqlRepo.GetProductsWithCategoryAsync(50);",
             "await connection.QueryAsync<Product, Category, Product>(sql, (p, c) => { p.Category = c; return p; }, new { Limit = 50 }, splitOn: \"Id\");",
             isColdStart
         );
@@ -275,17 +264,12 @@ public class PerformanceBenchmarkService
             return (inserted, AppDbContext.LastExecutedSql ?? "INSERT INTO Products (Name, Sku, ...) VALUES (@p0, @p1, ...)");
         });
 
-        // 2. EF Core NoTracking (Range add without change tracking lookup optimization)
-        AppDbContext.ClearLogs();
-        var efNoTrackingMetrics = await MeasureAsync(async () =>
+        // 2. Raw SQL Command
+        var sqlMetrics = await MeasureAsync(async () =>
         {
-            using var scope = _serviceProvider.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            db.ChangeTracker.AutoDetectChangesEnabled = false; // Optimize EF batch
             var batch = GenerateBatch(batchSize);
-            await db.Products.AddRangeAsync(batch);
-            var inserted = await db.SaveChangesAsync();
-            return (inserted, AppDbContext.LastExecutedSql ?? "INSERT INTO Products (Name, Sku, ...) VALUES (@p0, @p1, ...)");
+            var inserted = await _sqlRepository.BulkInsertProductsAsync(batch);
+            return (inserted, "INSERT INTO Products (Name, Sku, Price, Stock, CategoryId, CreatedAt) VALUES (@Name, @Sku, @Price, @Stock, @CategoryId, @CreatedAt)");
         });
 
         // 3. Dapper
@@ -300,9 +284,9 @@ public class PerformanceBenchmarkService
             "bulk-insert",
             "4. Thêm mới hàng loạt dữ liệu (Bulk Insert 100 bản ghi)",
             $"Tạo mới và chèn {batchSize} bản ghi vào CSDL.",
-            efTrackingMetrics, efNoTrackingMetrics, dapperMetrics,
+            efTrackingMetrics, sqlMetrics, dapperMetrics,
             "await db.Products.AddRangeAsync(batch);\nawait db.SaveChangesAsync();",
-            "db.ChangeTracker.AutoDetectChangesEnabled = false;\nawait db.Products.AddRangeAsync(batch);\nawait db.SaveChangesAsync();",
+            "await sqlRepo.BulkInsertProductsAsync(batch);",
             "await connection.ExecuteAsync(insertSql, batchArray);",
             isColdStart
         );
@@ -331,20 +315,16 @@ public class PerformanceBenchmarkService
             return (count, AppDbContext.LastExecutedSql ?? "UPDATE Products SET Price = @p0 WHERE Id = @p1");
         });
 
-        // 2. EF Core ExecuteUpdate (Modern EF Core SQL Direct Update)
-        AppDbContext.ClearLogs();
-        var efNoTrackingMetrics = await MeasureAsync(async () =>
+        // 2. Raw SQL Command
+        var sqlMetrics = await MeasureAsync(async () =>
         {
-            using var scope = _serviceProvider.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             int count = 0;
             for (int i = 0; i < iterations; i++)
             {
-                count += await db.Products
-                    .Where(p => p.Id == targetId)
-                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.Price, p => p.Price + 0.01m));
+                var updated = await _sqlRepository.UpdateProductAsync(targetId, 199.99m);
+                if (updated) count++;
             }
-            return (count, AppDbContext.LastExecutedSql ?? "UPDATE Products SET Price = Price + 0.01 WHERE Id = 1");
+            return (count, "UPDATE Products SET Price = @Price WHERE Id = @Id");
         });
 
         // 3. Dapper
@@ -368,9 +348,9 @@ public class PerformanceBenchmarkService
             "update",
             "5. Cập nhật bản ghi (Update Scenario)",
             $"Thực thi cập nhật thuộc tính Price cho sản phẩm Id={targetId} trong {iterations} lần lặp.",
-            efTrackingMetrics, efNoTrackingMetrics, dapperMetrics,
-            "var prod = await db.Products.FindAsync(id);\nprod.Price += 0.01m;\nawait db.SaveChangesAsync(); // (EF ChangeTracker tự sinh UPDATE)",
-            "await db.Products.Where(p => p.Id == id).ExecuteUpdateAsync(s => s.SetProperty(p => p.Price, p => p.Price + 0.01m)); // (EF Direct Update)",
+            efTrackingMetrics, sqlMetrics, dapperMetrics,
+            "var prod = await db.Products.FindAsync(id);\nprod.Price += 0.01m;\nawait db.SaveChangesAsync(); // (EF ChangeTracker)",
+            "await sqlRepo.UpdateProductAsync(id, newPrice); // (Raw ADO.NET SqlCommand)",
             "var prod = await repo.GetByIdAsync(id);\nprod.Price += 0.01m;\nawait connection.ExecuteAsync(updateSql, prod); // (Explicit UPDATE)",
             isColdStart
         );
@@ -400,15 +380,15 @@ public class PerformanceBenchmarkService
     private BenchmarkComparisonSuite BuildSuite(
         string id, string title, string description,
         (double ms, double us, long allocatedBytes, int count, string sql) efTrack,
-        (double ms, double us, long allocatedBytes, int count, string sql) efNoTrack,
+        (double ms, double us, long allocatedBytes, int count, string sql) sqlCmd,
         (double ms, double us, long allocatedBytes, int count, string sql) dapper,
-        string codeEfTrack, string codeEfNoTrack, string codeDapper,
+        string codeEfTrack, string codeSqlCmd, string codeDapper,
         bool isColdStart)
     {
         var efTrackRes = new BenchmarkResult
         {
             ScenarioName = title,
-            Mode = "EF Core (Tracking)",
+            Mode = "EF Core",
             ElapsedMilliseconds = Math.Round(efTrack.ms, 3),
             ElapsedMicroseconds = Math.Round(efTrack.us, 1),
             AllocatedBytes = efTrack.allocatedBytes,
@@ -418,16 +398,16 @@ public class PerformanceBenchmarkService
             IsColdStart = isColdStart
         };
 
-        var efNoTrackRes = new BenchmarkResult
+        var sqlCmdRes = new BenchmarkResult
         {
             ScenarioName = title,
-            Mode = "EF Core (AsNoTracking / Direct)",
-            ElapsedMilliseconds = Math.Round(efNoTrack.ms, 3),
-            ElapsedMicroseconds = Math.Round(efNoTrack.us, 1),
-            AllocatedBytes = efNoTrack.allocatedBytes,
-            ResultCount = efNoTrack.count,
-            SqlExecuted = efNoTrack.sql,
-            CodeSnippet = codeEfNoTrack,
+            Mode = "SQL Command (ADO.NET)",
+            ElapsedMilliseconds = Math.Round(sqlCmd.ms, 3),
+            ElapsedMicroseconds = Math.Round(sqlCmd.us, 1),
+            AllocatedBytes = sqlCmd.allocatedBytes,
+            ResultCount = sqlCmd.count,
+            SqlExecuted = sqlCmd.sql,
+            CodeSnippet = codeSqlCmd,
             IsColdStart = isColdStart
         };
 
@@ -449,8 +429,8 @@ public class PerformanceBenchmarkService
             : 1.0;
 
         string speedup = ratio > 1.0 
-            ? $"⚡ Dapper nhanh hơn EF Core (Tracking) khoảng **{ratio}x** trong kịch bản này."
-            : "⚡ Thời gian thực thi giữa EF Core và Dapper gần như tương đương.";
+            ? $"⚡ Dapper / SQL Command nhanh hơn EF Core khoảng **{ratio}x** trong kịch bản này."
+            : "⚡ Thời gian thực thi giữa các phương thức gần như tương đương.";
 
         return new BenchmarkComparisonSuite
         {
@@ -458,7 +438,7 @@ public class PerformanceBenchmarkService
             Title = title,
             Description = description,
             EfCoreTrackingResult = efTrackRes,
-            EfCoreNoTrackingResult = efNoTrackRes,
+            SqlCommandResult = sqlCmdRes,
             DapperResult = dapperRes,
             SpeedupSummary = speedup
         };
