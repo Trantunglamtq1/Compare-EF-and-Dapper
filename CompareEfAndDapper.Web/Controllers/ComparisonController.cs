@@ -72,11 +72,13 @@ public class ComparisonController : ControllerBase
     public IActionResult GetFlowInfo()
     {
         var efFlow = _flowAnalyzer.GetEfCoreFlowInfo();
+        var sqlCmdFlow = _flowAnalyzer.GetSqlCommandFlowInfo();
         var dapperFlow = _flowAnalyzer.GetDapperFlowInfo();
 
         return Ok(new
         {
             efCore = efFlow,
+            sqlCommand = sqlCmdFlow,
             dapper = dapperFlow
         });
     }

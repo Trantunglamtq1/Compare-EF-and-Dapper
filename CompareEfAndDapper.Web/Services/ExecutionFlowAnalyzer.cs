@@ -153,4 +153,63 @@ public class ExecutionFlowAnalyzer
             }
         };
     }
+
+    public FrameworkFlowInfo GetSqlCommandFlowInfo()
+    {
+        return new FrameworkFlowInfo
+        {
+            FrameworkName = "SQL Command (Raw ADO.NET)",
+            Type = "Native ADO.NET Data Provider (Microsoft.Data.SqlClient)",
+            Summary = "SQL Command (Raw ADO.NET) là lớp truy cập dữ liệu thấp nhất trong C# mà không qua bất kỳ ORM nào. Cài đặt trực tiếp SqlConnection, SqlCommand, SqlDataReader và tự tay đọc/ép kiểu từng cột (Manual Mapping).",
+            Steps = new List<ExecutionStep>
+            {
+                new ExecutionStep
+                {
+                    StepNumber = 1,
+                    Name = "Khởi tạo SqlConnection & SqlCommand",
+                    Category = "Preparation",
+                    Description = "Khởi tạo đối tượng SqlConnection và SqlCommand với chuỗi SQL và tham số.",
+                    InternalMechanism = "Giao tiếp trực tiếp với ADO.NET Connection Pool để lấy kết nối Socket đến database server.",
+                    CodeSnippet = "await using var connection = new SqlConnection(connStr);\nawait using var command = new SqlCommand(sql, connection);"
+                },
+                new ExecutionStep
+                {
+                    StepNumber = 2,
+                    Name = "Gắn tham số SQL (SqlParameter)",
+                    Category = "Preparation",
+                    Description = "Tạo các đối tượng SqlParameter thủ công để chống SQL Injection.",
+                    InternalMechanism = "Gắn kiểu dữ liệu SqlParameter (SqlDbType.Int, SqlDbType.NVarChar...) thẳng vào command.Parameters.",
+                    CodeSnippet = "command.Parameters.AddWithValue(\"@Price\", 100);"
+                },
+                new ExecutionStep
+                {
+                    StepNumber = 3,
+                    Name = "Không qua bước Biên dịch/Dịch LINQ/Reflection",
+                    Category = "Compilation",
+                    Description = "Bỏ qua hoàn toàn mọi tầng trung gian biên dịch của ORM.",
+                    InternalMechanism = "Mã C# gửi trực tiếp chuỗi SQL dạng Parameterized Query tới máy chủ SQL Server mà không mất thời gian phân tích Expression Tree hay sinh IL Code.",
+                    CodeSnippet = "// Zero ORM Compilation Overhead"
+                },
+                new ExecutionStep
+                {
+                    StepNumber = 4,
+                    Name = "Thực thi DbCommand (ExecuteReaderAsync)",
+                    Category = "Database",
+                    Description = "Gửi lệnh SQL qua stream TCP port 1433 tới SQL Server.",
+                    InternalMechanism = "SQL Server biên dịch câu SQL (Query Optimizer -> Execution Plan) và trả về luồng stream dữ liệu SqlDataReader.",
+                    CodeSnippet = "await connection.OpenAsync();\nawait using var reader = await command.ExecuteReaderAsync();"
+                },
+                new ExecutionStep
+                {
+                    StepNumber = 5,
+                    Name = "Materialization thủ công (Manual Loop & Read)",
+                    Category = "Materialization",
+                    Description = "Dùng vòng lặp while (reader.ReadAsync()) và đọc từng thuộc tính bằng Ordinal Index hoặc GetInt32/GetString.",
+                    InternalMechanism = "Tự tay khởi tạo new Product() và gán giá trị từng column. Đây là phương thức đọc dữ liệu nhanh nhất và tốn ít RAM nhất.",
+                    CodeSnippet = "while (await reader.ReadAsync()) {\n    list.Add(new Product {\n        Id = reader.GetInt32(0),\n        Name = reader.GetString(1)\n    });\n}"
+                }
+            }
+        };
+    }
 }
+

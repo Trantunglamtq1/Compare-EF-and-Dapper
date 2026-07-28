@@ -400,6 +400,11 @@ select:focus, input:focus {
   border-left: 3px solid var(--accent-dapper);
 }
 
+.sql-step .step-mechanism {
+  background: rgba(16, 185, 129, 0.05);
+  border-left: 3px solid var(--accent-sql);
+}
+
 /* Matrix Table */
 .matrix-table {
   width: 100%;

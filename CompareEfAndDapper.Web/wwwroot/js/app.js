@@ -38,6 +38,9 @@ async function fetchFlowInfo() {
         const data = await res.json();
 
         renderFlowSteps('efFlowSteps', data.efCore.steps, 'ef');
+        if (data.sqlCommand) {
+            renderFlowSteps('sqlCommandFlowSteps', data.sqlCommand.steps, 'sql');
+        }
         renderFlowSteps('dapperFlowSteps', data.dapper.steps, 'dapper');
     } catch (err) {
         console.error('Error fetching flow info:', err);

@@ -150,14 +150,14 @@
   <!-- TAB 2: CODE STRUCTURE -->
   <div id="codeTab" class="tab-panel">
     <div class="controls-card">
-      <h2>💻 So Sánh Cấu Trúc Code & Hình Dáng Cú Pháp</h2>
-      <p style="color: var(--text-muted); margin-top: 4px;">Dưới đây là so sánh song song hình dáng code của Entity Framework Core và Dapper trong từng kịch bản cụ thể.</p>
+      <h2>💻 So Sánh Cấu Trúc Code & Cú Pháp 3 Phương Pháp</h2>
+      <p style="color: var(--text-muted); margin-top: 4px;">Dưới đây là so sánh song song hình dáng code của Entity Framework Core, SQL Command (Raw ADO.NET) và Dapper trong từng kịch bản cụ thể.</p>
     </div>
 
-    <div class="flow-container">
+    <div class="flow-container" style="grid-template-columns: repeat(3, 1fr);">
       <div class="flow-column">
-        <h3 style="color: var(--accent-ef); margin-bottom: 16px;">🔷 Entity Framework Core (LINQ & DbContext)</h3>
-        <div class="code-box" style="max-height: none; font-size: 0.9rem;">
+        <h3 style="color: var(--accent-ef); margin-bottom: 16px;">🔷 EF Core (LINQ & DbContext)</h3>
+        <div class="code-box" style="max-height: none; font-size: 0.85rem;">
 // 1. Single Read according to Id
 Product? p1 = await db.Products.FindAsync(id);
 
@@ -181,13 +181,48 @@ await db.SaveChangesAsync();
 // 5. Change Tracking Update
 var prod = await db.Products.FindAsync(id);
 prod.Price += 10m;
-await db.SaveChangesAsync(); // EF tự phát hiện Price đổi và sinh SQL UPDATE
+await db.SaveChangesAsync();
         </div>
       </div>
 
       <div class="flow-column">
-        <h3 style="color: var(--accent-dapper); margin-bottom: 16px;">🔶 Dapper (Raw SQL & IDbConnection)</h3>
-        <div class="code-box" style="max-height: none; font-size: 0.9rem;">
+        <h3 style="color: var(--accent-sql); margin-bottom: 16px;">🟩 SQL Command (Raw ADO.NET)</h3>
+        <div class="code-box" style="max-height: none; font-size: 0.85rem;">
+// 1. Single Read according to Id
+var cmd = new SqlCommand("SELECT TOP 1 * FROM Products WHERE Id = @Id", conn);
+cmd.Parameters.AddWithValue("@Id", id);
+using var reader = await cmd.ExecuteReaderAsync();
+if (await reader.ReadAsync()) { var p = MapProduct(reader); }
+
+// 2. Filter & Sorting Query
+var cmd2 = new SqlCommand("SELECT TOP (50) * FROM Products WHERE CategoryId = @CatId AND Price >= @MinPrice ORDER BY Price DESC", conn);
+cmd2.Parameters.AddWithValue("@CatId", catId);
+cmd2.Parameters.AddWithValue("@MinPrice", 50m);
+using var reader2 = await cmd2.ExecuteReaderAsync();
+while (await reader2.ReadAsync()) { list.Add(MapProduct(reader2)); }
+
+// 3. Multi-table Join (Thủ công Reader parsing)
+var cmd3 = new SqlCommand("SELECT p.*, c.Name as CatName FROM Products p INNER JOIN Categories c ON p.CategoryId = c.Id", conn);
+using var reader3 = await cmd3.ExecuteReaderAsync();
+// Loop & Manual Object Graph Construction...
+
+// 4. Bulk Insert (Thủ công Loop SqlCommand / SqlBulkCopy)
+foreach (var p in batch) {
+    var ins = new SqlCommand("INSERT INTO Products ...", conn);
+    await ins.ExecuteNonQueryAsync();
+}
+
+// 5. Explicit ADO.NET Update
+var up = new SqlCommand("UPDATE Products SET Price = @Price WHERE Id = @Id", conn);
+up.Parameters.AddWithValue("@Price", newPrice);
+up.Parameters.AddWithValue("@Id", id);
+await up.ExecuteNonQueryAsync();
+        </div>
+      </div>
+
+      <div class="flow-column">
+        <h3 style="color: var(--accent-dapper); margin-bottom: 16px;">🔶 Dapper (Micro-ORM)</h3>
+        <div class="code-box" style="max-height: none; font-size: 0.85rem;">
 // 1. Single Read according to Id
 var sql1 = "SELECT * FROM Products WHERE Id = @Id";
 Product? p1 = await connection.QuerySingleOrDefaultAsync<Product>(sql1, new { Id = id });
@@ -196,7 +231,7 @@ Product? p1 = await connection.QuerySingleOrDefaultAsync<Product>(sql1, new { Id
 var sql2 = "SELECT TOP (50) * FROM Products WHERE CategoryId = @CatId AND Price >= @MinPrice ORDER BY Price DESC";
 var list1 = await connection.QueryAsync<Product>(sql2, new { CatId = catId, MinPrice = 50m });
 
-// 3. Multi-table Join (Multi-mapping với splitOn)
+// 3. Multi-table Join (Multi-mapping splitOn)
 var sql3 = @"SELECT p.*, c.* FROM Products p 
              INNER JOIN Categories c ON p.CategoryId = c.Id";
 var list2 = await connection.QueryAsync<Product, Category, Product>(sql3, 
@@ -222,10 +257,15 @@ await connection.ExecuteAsync(sql5, new { Price = newPrice, Id = id });
       <p style="color: var(--text-muted); margin-top: 4px;">Xem quy trình chi tiết từng bước mà C# Engine, ADO.NET và SQL Server xử lý khi thực thi truy vấn.</p>
     </div>
 
-    <div class="flow-container" id="flowContainer">
+    <div class="flow-container" id="flowContainer" style="grid-template-columns: repeat(3, 1fr);">
       <div class="flow-column">
         <h3 style="color: var(--accent-ef); margin-bottom: 16px;">🔷 EF Core Execution Pipeline</h3>
         <div id="efFlowSteps">Đang tải luồng EF Core...</div>
+      </div>
+
+      <div class="flow-column">
+        <h3 style="color: var(--accent-sql); margin-bottom: 16px;">🟩 SQL Command (ADO.NET Pipeline)</h3>
+        <div id="sqlCommandFlowSteps">Đang tải luồng SQL Command...</div>
       </div>
 
       <div class="flow-column">
@@ -238,7 +278,7 @@ await connection.ExecuteAsync(sql5, new { Price = newPrice, Id = id });
   <!-- TAB 4: COMPARISON MATRIX -->
   <div id="matrixTab" class="tab-panel">
     <div class="controls-card">
-      <h2>📊 Bảng So Sánh Tổng Quan EF Core vs Dapper</h2>
+      <h2>📊 Bảng So Sánh Tổng Quan EF Core vs SQL Command vs Dapper</h2>
     </div>
 
     <table class="matrix-table">
@@ -246,6 +286,7 @@ await connection.ExecuteAsync(sql5, new { Price = newPrice, Id = id });
         <tr>
           <th>Tiêu chí</th>
           <th style="color: var(--accent-ef);">Entity Framework Core</th>
+          <th style="color: var(--accent-sql);">SQL Command (ADO.NET)</th>
           <th style="color: var(--accent-dapper);">Dapper</th>
         </tr>
       </thead>
@@ -253,32 +294,38 @@ await connection.ExecuteAsync(sql5, new { Price = newPrice, Id = id });
         <tr>
           <td><strong>Phân loại</strong></td>
           <td>Full-featured ORM</td>
+          <td>Native ADO.NET Provider</td>
           <td>Micro-ORM (Extension Methods)</td>
         </tr>
         <tr>
           <td><strong>Trải nghiệm lập trình (DX)</strong></td>
           <td>Rất cao (Type-safe LINQ, Auto-complete, Migrations)</td>
-          <td>Cao (Viết SQL thuần linh hoạt nhưng phải tự kiểm soát cú pháp chuỗi)</td>
+          <td>Thấp (Viết SQL thủ công, map tay từng cột)</td>
+          <td>Cao (SQL linh hoạt, tự động map POCO)</td>
         </tr>
         <tr>
           <td><strong>Cơ chế Map dữ liệu</strong></td>
           <td>LINQ Expression Tree -> SQL AST -> Materialization</td>
-          <td>Reflection.Emit (Tạo IL Code Deserializer động cực nhanh)</td>
+          <td>Manual DataReader Indexing / Casting</td>
+          <td>Reflection.Emit (Tạo IL Code Deserializer động)</td>
         </tr>
         <tr>
           <td><strong>Change Tracking</strong></td>
-          <td>Có (Tự nhận biết đối tượng sửa/xóa/thêm để lưu)</td>
-          <td>Không (Zero Change Tracking - Developer tự viết câu UPDATE)</td>
+          <td>Có (Tự nhận biết đối tượng sửa/xóa/thêm)</td>
+          <td>Không (Developer tự quản lý)</td>
+          <td>Không (Zero Change Tracking)</td>
         </tr>
         <tr>
           <td><strong>Hiệu năng (Performance)</strong></td>
-          <td>Nhanh (Đã tối ưu Compiled Query Cache từ EF Core 6+)</td>
+          <td>Nhanh (Có Compiled Query Cache)</td>
+          <td>Tối đa (Gốc của .NET Data Access)</td>
           <td>Cực nhanh (Tiệm cận ADO.NET thuần)</td>
         </tr>
         <tr>
           <td><strong>Phù hợp cho dự án</strong></td>
-          <td>Domain-driven design, CRUD nghiệp vụ phức tạp, Admin Panel</td>
-          <td>High-throughput APIs, Reporting, Microservices, Batch processing</td>
+          <td>Domain-driven design, CRUD phức tạp</td>
+          <td>Hệ thống lõi siêu hiệu năng, High IOPS</td>
+          <td>High-throughput APIs, Microservices, Reports</td>
         </tr>
       </tbody>
     </table>
