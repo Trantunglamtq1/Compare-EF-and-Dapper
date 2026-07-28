@@ -10,3 +10,18 @@ services:
       - ACCEPT_EULA=Y
       - MSSQL_SA_PASSWORD=YourStrongPassword123!
     restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: CompareEfAndDapper.Web/Dockerfile
+    container_name: ef_vs_dapper_web
+    ports:
+      - "5000:8080"
+    environment:
+      - ConnectionStrings__SqlServerDocker=Server=sqlserver,1433;Database=EfVsDapperDb;User Id=sa;Password=YourStrongPassword123!;TrustServerCertificate=True;
+      - ConnectionStrings__SqlServer=Server=sqlserver,1433;Database=EfVsDapperDb;User Id=sa;Password=YourStrongPassword123!;TrustServerCertificate=True;
+      - UseSqlServer=true
+    depends_on:
+      - sqlserver
+    restart: unless-stopped

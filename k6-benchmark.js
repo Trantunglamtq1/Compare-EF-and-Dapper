@@ -8,8 +8,10 @@ const scenario = (__ENV.SCENARIO || 'single-read').toLowerCase();
 const baseUrl = __ENV.BASE_URL || 'http://localhost:5136';
 
 const targetLabel = target === 'dapper' ? 'DAPPER' : 'EF_CORE';
-const metricNameLatency = `latency_${target}_${scenario}`;
-const metricNameErrors = `errors_${target}_${scenario}`;
+const scenarioClean = scenario.replace(/-/g, '_').toUpperCase();
+
+const metricNameLatency = `latency_${target}_${scenarioClean.toLowerCase()}`;
+const metricNameErrors = `errors_${target}_${scenarioClean.toLowerCase()}`;
 
 const responseTrend = new Trend(metricNameLatency);
 const errorCounter = new Counter(metricNameErrors);
@@ -17,7 +19,7 @@ const errorCounter = new Counter(metricNameErrors);
 // Phân biệt tên scenario trực tiếp trên giao diện K6 Terminal Header
 export const options = {
     scenarios: {
-        [`TEST_${targetLabel}_${scenario.toUpperCase()}`]: {
+        [`TEST_${targetLabel}_${scenarioClean}`]: {
             executor: 'ramping-vus',
             startVUs: 0,
             stages: [
