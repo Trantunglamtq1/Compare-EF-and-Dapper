@@ -3,17 +3,14 @@ import { check, sleep } from 'k6';
 import { Trend, Counter } from 'k6/metrics';
 
 // Custom Parameters (truyền qua -e TARGET=... -e SCENARIO=... -e BASE_URL=...)
-const target = (__ENV.TARGET || 'ef').toLowerCase(); // 'ef' | 'dapper' | 'sql'
+const target = (__ENV.TARGET || 'ef').toLowerCase(); // 'ef' hoặc 'dapper'
 const scenario = (__ENV.SCENARIO || 'single-read').toLowerCase();
 const baseUrl = __ENV.BASE_URL || 'http://localhost:5136';
 
-const targetLabel = target === 'dapper' ? 'DAPPER'
-                  : target === 'sql'    ? 'SQL_CMD'
-                  : 'EF_CORE';
-const scenarioClean = scenario.replace(/-/g, '_').toUpperCase();
-
-const metricNameLatency = `latency_${target}_${scenarioClean.toLowerCase()}`;
-const metricNameErrors = `errors_${target}_${scenarioClean.toLowerCase()}`;
+const targetLabel = target === 'dapper' ? 'DAPPER' : target === 'sql' ? 'SQL_CMD' : 'EF_CORE';
+const scenarioClean = scenario.replace(/-/g, '_').toLowerCase();
+const metricNameLatency = `latency_${target}_${scenarioClean}`;
+const metricNameErrors = `errors_${target}_${scenarioClean}`;
 
 const responseTrend = new Trend(metricNameLatency);
 const errorCounter = new Counter(metricNameErrors);
@@ -21,7 +18,7 @@ const errorCounter = new Counter(metricNameErrors);
 // Phân biệt tên scenario trực tiếp trên giao diện K6 Terminal Header
 export const options = {
     scenarios: {
-        [`TEST_${targetLabel}_${scenarioClean}`]: {
+        [`TEST_${targetLabel}_${scenarioClean.toUpperCase()}`]: {
             executor: 'ramping-vus',
             startVUs: 0,
             stages: [
@@ -40,29 +37,29 @@ export const options = {
 
 export default function () {
     let res;
-    
+
     if (scenario === 'single-read') {
         const id = Math.floor(Math.random() * 100) + 1;
         const url = `${baseUrl}/api/k6/${target}/single-read/${id}`;
         res = http.get(url, { headers: { 'Accept': 'application/json' } });
-    } 
+    }
     else if (scenario === 'filter-query') {
         const url = `${baseUrl}/api/k6/${target}/filter-query?categoryId=1&minPrice=50&limit=50`;
         res = http.get(url, { headers: { 'Accept': 'application/json' } });
-    } 
+    }
     else if (scenario === 'join-query') {
         const url = `${baseUrl}/api/k6/${target}/join-query?limit=50`;
         res = http.get(url, { headers: { 'Accept': 'application/json' } });
-    } 
+    }
     else if (scenario === 'bulk-insert') {
         const url = `${baseUrl}/api/k6/${target}/bulk-insert?count=20`;
         res = http.post(url, null, { headers: { 'Accept': 'application/json' } });
-    } 
+    }
     else if (scenario === 'update') {
         const id = Math.floor(Math.random() * 10) + 1;
         const url = `${baseUrl}/api/k6/${target}/update/${id}`;
         res = http.put(url, null, { headers: { 'Accept': 'application/json' } });
-    } 
+    }
     else {
         const url = `${baseUrl}/api/k6/${target}/single-read/42`;
         res = http.get(url, { headers: { 'Accept': 'application/json' } });
